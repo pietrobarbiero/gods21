@@ -54,7 +54,7 @@ def main():
         #          -2 ${fn}/${samp}_2.fastq.gz \
         #          -p 8 --validateMappings -o quants/${samp}_quant
         f"rule align-salmon",
-        f"    command = echo $in $out | xargs -l bash -c 'salmon quant -i $$0 -l A -1 $$1 -2 $$2 -p 16 --validateMappings -o $$3'",
+        f"    command = echo $in $out | xargs -l bash -c 'salmon quant -i $$0 -l A -1 $$1 -2 $$2 -p 25 --validateMappings -o $$3'",
         f"    description = Salmon alignment",
         f"",
         f"",
@@ -65,7 +65,7 @@ def main():
         build_ninja.append(f'build {sample_dict[sample]["R1"]}: unify-lanes {sample_dict[sample]["L001_R1"]} {sample_dict[sample]["L002_R1"]}')
         build_ninja.append(f'build {sample_dict[sample]["R2"]}: unify-lanes {sample_dict[sample]["L001_R2"]} {sample_dict[sample]["L002_R2"]}')
         build_ninja.append(f'build {sample_dict[sample]["fastp_R1"]} {sample_dict[sample]["fastp_R2"]} {sample_dict[sample]["fastp_html"]}: quality-check {sample_dict[sample]["R1"]} {sample_dict[sample]["R2"]}')
-        build_ninja.append(f'build {sample_dict[sample]["quant"]}: align-salmon {reference_dict["index"]} {sample_dict[sample]["R1"]} {sample_dict[sample]["R2"]}')
+        build_ninja.append(f'build {sample_dict[sample]["quant"]}: align-salmon {reference_dict["index"]} {sample_dict[sample]["fastp_R1"]} {sample_dict[sample]["fastp_R2"]}')
 
     # create ninja build
     build_ninja.append("\n")
