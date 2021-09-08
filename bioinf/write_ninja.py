@@ -53,8 +53,9 @@ def main():
         #          -1 ${fn}/${samp}_1.fastq.gz \
         #          -2 ${fn}/${samp}_2.fastq.gz \
         #          -p 8 --validateMappings -o quants/${samp}_quant
+        # TODO: to re-run with --gcBias flag!!
         f"rule align-salmon",
-        f"    command = echo $in $out | xargs -l bash -c 'salmon quant -i $$0 -l A -1 $$1 -2 $$2 -p 25 --validateMappings -o $$3'",
+        f"    command = echo $in $out | xargs -l bash -c 'salmon quant -i $$0 -l A -1 $$1 -2 $$2 -p 25 --gcBias --seqBias --validateMappings -o $$3'",
         f"    description = Salmon alignment",
         f"",
         f"",
