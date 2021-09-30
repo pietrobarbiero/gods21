@@ -1,7 +1,7 @@
 library(tidyverse)
 library(stringr)
 library(limma)
-data<-read.csv("./data.csv")
+data<-read.csv("./gods21_data_salmon.csv")
 data$Name<-str_split(data$Name,"\\|",simplify = T)[,6]
 
 # Transcripts corresponding to the same gene are averaged 
@@ -11,7 +11,7 @@ data<-avereps(data[,-1],ID=data$Name)
 dim(data)
 
 # Extract the corresponding DS samples and phenotype
-phenotype<-read.csv("./phenotype.csv")
+phenotype<-read.csv("./gods21_phenotype.csv")
 phenotype_DS<-phenotype[7:12,]
 
 data_DS<- data[, match(paste0("Sample_",phenotype_DS$SampleName),colnames(data) )]   
