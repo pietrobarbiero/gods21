@@ -1,0 +1,13 @@
+# sample config defaults file
+epochs:
+  desc: Number of epochs to train over
+  value: 1
+lr:
+  desc: Learning rate
+  value: 0.001
+max_generations:
+  desc: Max generations for evolutionary algorithm
+  value: 300
+max_features:
+  desc: Max features for feature selection
+  value: 30
