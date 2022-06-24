@@ -16,11 +16,15 @@
 # limitations under the License.
 import math
 import random
+import os
+import joblib
 import copy
 from typing import Union, List
 
 import inspyred
 import datetime
+
+import joblib
 import numpy as np
 import multiprocessing
 
@@ -35,6 +39,7 @@ import warnings
 import pandas as pd
 
 import torch
+from sklearn.preprocessing import StandardScaler
 from torch.nn.functional import one_hot
 
 import torch_explain as te
@@ -47,7 +52,7 @@ class EvoLENs(BaseEstimator, TransformerMixin):
     EvoFS class.
     """
 
-    def __init__(self, lens: torch.nn.Module, optimizer_name, loss_form, lr: float = 0.001,
+    def __init__(self, lens: torch.nn.Module, optimizer_name, loss_form, lr: float = 0.01,
                  compression: str = 'both',
                  pop_size: int = 100, max_generations: int = 100,
                  max_features: int = 100, min_features: int = 10,
@@ -92,29 +97,45 @@ class EvoLENs(BaseEstimator, TransformerMixin):
         self.max_samples_ = np.min([n, self.max_samples])
         self.reset_generations_ = np.min([self.max_generations_, self.reset_generations])
         self.optimizer_ = torch.optim.AdamW(self.lens.parameters(), lr=self.lr)
+        self.train_epochs_ = self.train_epochs
 
-        skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=self.random_state)
-        list_of_splits = [split for split in skf.split(X, y)]
-        trainval_index, test_index = list_of_splits[0]
-        self.x_trainval_, x_test = X.iloc[trainval_index], X.iloc[test_index]
-        self.y_trainval_, y_test = y[trainval_index], y[test_index]
+        self.x_, self.y_ = torch.FloatTensor(X.values), torch.LongTensor(y)
+        self.y1h_ = one_hot(torch.LongTensor(self.y_)).float()
+        self.skf_trainval_test_ = StratifiedKFold(n_splits=10, shuffle=True, random_state=self.random_state)
+        self.trainval_index_, self.test_index_ = next(self.skf_trainval_test_.split(self.x_, self.y_))
+        self.skf_train_val_ = StratifiedKFold(n_splits=10, shuffle=True, random_state=self.random_state)
+        self.train_index_, self.val_index_ = next(self.skf_train_val_.split(self.x_[self.trainval_index_], self.y_[self.trainval_index_]))
 
-        self.skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=self.random_state)
-        # list_of_splits2 = [split for split in self.skf.split(self.x_trainval_, self.y_trainval_)]
-        # train_index, val_index = list_of_splits2[0]
-        # self.x_train_, self.x_val = self.x_trainval_.iloc[train_index], self.x_trainval_.iloc[val_index]
-        # self.y_train_, self.y_val = self.y_trainval_[train_index], self.y_trainval_[val_index]
+        # self.train_epochs_ = 10000
+        # # for layer in self.lens.children():
+        # #     if hasattr(layer, 'reset_parameters'):
+        # #         layer.reset_parameters()
+        # self.optimizer_ = torch.optim.AdamW(self.lens.parameters(), lr=self.lr)
+        # candidate = np.arange(0, self.x_.shape[1])
+        # print(candidate)
+        # self._evaluate_candidate(candidate, train=True)
+        # f1, explanation_accuracy, explanation_complexity, explanations = self._evaluate_candidate(candidate, train=False)
+        # for layer in self.lens.children():
+        #     if hasattr(layer, 'reset_parameters'):
+        #         layer.reset_parameters()
+        # self.optimizer_ = torch.optim.AdamW(self.lens.parameters(), lr=self.lr)
+        # self.train_epochs_ = self.train_epochs
+        #
+        # print('Initial F1: {:.2f}'.format(f1))
+        # print('Initial explanation accuracy: {:.2f}'.format(explanation_accuracy))
+        # print('Initial explanation complexity: {:.2f}'.format(explanation_complexity))
+        # print('Initial explanations: {}'.format(explanations))
 
         # initialize pseudo-random number generation
         prng = random.Random()
         prng.seed(self.random_state)
 
-        ea = inspyred.ec.emo.NSGA2(prng)
-        ea.variator = [self._variate]
-        ea.terminator = inspyred.ec.terminators.generation_termination
-        ea.observer = self._observe
+        self.ea = inspyred.ec.emo.NSGA2(prng)
+        self.ea.variator = [self._variate]
+        self.ea.terminator = inspyred.ec.terminators.generation_termination
+        self.ea.observer = self._observe
 
-        ea.evolve(
+        self.ea.evolve(
             generator=self._generate,
 
             evaluator=self._evaluate,
@@ -135,43 +156,39 @@ class EvoLENs(BaseEstimator, TransformerMixin):
         print('Training completed!')
 
         # find best individual, the one with the highest accuracy on the validation set
-        accuracy_best = 0
-        self.solutions_ = []
+        f1_best = 0
+        self.optimal_solutions_ = []
         feature_counts = np.zeros(X.shape[1])
-        for individual in ea.archive:
+        self.train_epochs_ = 2000
+        for individual in self.ea.archive:
+            candidate = individual.candidate[1]
+            feature_counts[candidate] += 1
 
-            feature_set = individual.candidate[1]
-            feature_counts[feature_set] += 1
+            for layer in self.lens.children():
+                if hasattr(layer, 'reset_parameters'):
+                    layer.reset_parameters()
+            self.optimizer_ = torch.optim.AdamW(self.lens.parameters(), lr=self.lr)
+            self._evaluate_candidate(candidate, train=True)
+            f1, explanation_accuracy, explanation_complexity, explanations = self._evaluate_candidate(candidate,
+                                                                                                      train=False)
 
-            if self.compression == 'features':
-                x_reduced = self.x_trainval_.iloc[:, individual.candidate[1]]
-                y_reduced = self.y_trainval_
-                x_test_reduced = x_test.iloc[:, individual.candidate[1]]
-            elif self.compression == 'samples':
-                x_reduced = self.x_trainval_.iloc[individual.candidate[0]]
-                y_reduced = self.y_trainval_[individual.candidate[0]]
-                x_test_reduced = x_test
-            elif self.compression == 'both':
-                x_reduced = self.x_trainval_.iloc[individual.candidate[0], individual.candidate[1]]
-                y_reduced = self.y_trainval_[individual.candidate[0]]
-                x_test_reduced = x_test.iloc[:, individual.candidate[1]]
-
-            model = copy.deepcopy(self.estimator)
-            model.fit(x_reduced, y_reduced)
-
-            # compute validation accuracy
-            accuracy_test = self.scorer_(model, x_test_reduced, y_test)
-
-            if accuracy_best < accuracy_test:
+            if f1_best < f1:
                 self.best_set_ = {
-                    'samples': individual.candidate[0],
-                    'features': individual.candidate[1],
-                    'accuracy': accuracy_test,
+                    'features': candidate,
+                    'accuracy': f1,
+                    'explanation_accuracy': explanation_accuracy,
+                    'explanation_complexity': explanation_complexity,
+                    'explanations': explanations,
                 }
-                accuracy_best = accuracy_test
+                f1_best = f1
 
-            individual.validation_score_ = accuracy_test
-            self.solutions_.append(individual)
+            self.optimal_solutions_.append({
+                'features': candidate,
+                'accuracy': f1,
+                'explanation_accuracy': explanation_accuracy,
+                'explanation_complexity': explanation_complexity,
+                'explanations': explanations,
+            })
 
         self.feature_ranking_ = np.argsort(feature_counts)
         return self
@@ -193,12 +210,12 @@ class EvoLENs(BaseEstimator, TransformerMixin):
 
         if self.compression == 'features' or self.compression == 'both':
             n_features = random.randint(self.min_features_, self.max_features_)
-            individual_f = np.random.choice(self.x_trainval_.shape[1], size=(n_features,), replace=False).tolist()
+            individual_f = np.random.choice(self.x_.shape[1], size=(n_features,), replace=False).tolist()
             individual_f = np.sort(individual_f).tolist()
 
         if self.compression == 'samples' or self.compression == 'both':
             n_samples = random.randint(self.min_samples, self.max_samples_)
-            individual_s = np.random.choice(self.x_trainval_.shape[0], size=(n_samples,), replace=False).tolist()
+            individual_s = np.random.choice(self.x_.shape[0], size=(n_samples,), replace=False).tolist()
             individual_s = np.sort(individual_s).tolist()
 
         individual = [individual_s, individual_f]
@@ -211,12 +228,12 @@ class EvoLENs(BaseEstimator, TransformerMixin):
         if self.compression == 'features' or self.compression == 'both':
             candidates_f = [c[1] for c in candidates]
             nextgen_f = self._do_variation(random, candidates_f, self.min_features,
-                                           self.max_features_, self.x_trainval_.shape[1], args)
+                                           self.max_features_, self.x_.shape[1], args)
 
         if self.compression == 'samples' or self.compression == 'both':
             candidates_s = [c[0] for c in candidates]
             nextgen_s = self._do_variation(random, candidates_s, self.min_samples,
-                                           self.max_samples_, self.x_trainval_.shape[0], args)
+                                           self.max_samples_, self.x_.shape[0], args)
 
         next_generation = [[cs, cf] for cs, cf in zip(nextgen_s, nextgen_f)]
         return next_generation
@@ -229,9 +246,9 @@ class EvoLENs(BaseEstimator, TransformerMixin):
         parent = np.zeros((max_size), dtype=int)
 
         for father, mother in zip(fathers, mothers):
-            parent1 = 0*parent
+            parent1 = 0 * parent
             parent1[father] = 1
-            parent2 = 0*parent
+            parent2 = 0 * parent
             parent2[mother] = 1
 
             # well, for starters we just crossover two individuals, then mutate
@@ -256,8 +273,8 @@ class EvoLENs(BaseEstimator, TransformerMixin):
             next_gen = []
             for child in children:
                 child = np.array(child)
-                points_selected = list(np.argwhere(child == 1).squeeze())
-                points_not_selected = list(np.argwhere(child == 0).squeeze())
+                points_selected = list(np.argwhere(child == 1).squeeze(-1))
+                points_not_selected = list(np.argwhere(child == 0).squeeze(-1))
 
                 if len(points_selected) > max_candidate_size:
                     index = np.random.choice(points_selected, len(points_selected) - max_candidate_size)
@@ -267,7 +284,7 @@ class EvoLENs(BaseEstimator, TransformerMixin):
                     index = np.random.choice(points_not_selected, min_candidate_size - len(points_selected))
                     child[index] = 1
 
-                points_selected = list(np.argwhere(child == 1).squeeze())
+                points_selected = list(np.argwhere(child == 1).squeeze(-1))
                 next_gen.append(points_selected)
 
             next_generation.append(next_gen[0])
@@ -275,65 +292,72 @@ class EvoLENs(BaseEstimator, TransformerMixin):
 
         return next_generation
 
+    def _evaluate_candidate(self, candidate, train):
+        x_reduced = torch.zeros_like(self.x_)
+        x_reduced[:, candidate] = self.x_[:, candidate]
+
+        train_index = np.random.choice(self.trainval_index_, size=int(0.8*len(self.trainval_index_)), replace=False)
+        val_mask = torch.ones(len(self.x_), dtype=torch.bool)
+        val_mask[train_index] = False
+        val_mask[self.test_index_] = False
+        val_index = torch.where(val_mask)[0]
+
+        # TODO: reset the model
+
+        # train loop
+        if train:
+            self.optimizer_ = torch.optim.AdamW(self.lens.parameters(), lr=self.lr)
+            self.lens.train()
+            for epoch in range(self.train_epochs_):
+                self.optimizer_.zero_grad()
+                # y_pred = self.lens(x_reduced).squeeze(-1)
+                y_pred = self.lens(self.x_).squeeze(-1)
+                # loss = loss_form(y_pred[train_index], self.y_[train_index])
+                loss = loss_form(y_pred, self.y_)
+                loss.backward()
+                self.optimizer_.step()
+                if epoch % 100 == 0:
+                    print(f'Epoch {epoch}/{self.train_epochs_}: {loss.item()}')
+        else:
+            self.lens.eval()
+            y_pred = self.lens(x_reduced).squeeze(-1)
+
+        if train:
+            f1 = f1_score(self.y_[val_mask], y_pred[val_mask].argmax(axis=-1), average='weighted')
+            explanations = entropy.explain_classes(self.lens, self.x_, self.y1h_, train_index,
+                                                   val_mask=train_index,
+                                                   test_mask=val_index,
+                                                   c_threshold=0., y_threshold=0,
+                                                   topk_explanations=100, max_minterm_complexity=5)
+            explanation_accuracy = np.min([exp_dict['explanation_accuracy'] for exp_dict in explanations.values()])
+            explanation_complexity = np.max([exp_dict['explanation_complexity'] for exp_dict in explanations.values()])
+        else:
+            f1 = f1_score(self.y_[self.test_index_], y_pred[self.test_index_].argmax(axis=-1), average='weighted')
+            explanations = entropy.explain_classes(self.lens, self.x_, self.y1h_, self.trainval_index_,
+                                                   val_mask=self.trainval_index_, test_mask=self.test_index_,
+                                                   c_threshold=0., y_threshold=0,
+                                                   topk_explanations=100, max_minterm_complexity=5)
+            explanation_accuracy = np.median([exp_dict['explanation_accuracy'] for exp_dict in explanations.values()])
+            explanation_complexity = np.median([exp_dict['explanation_complexity'] for exp_dict in explanations.values()])
+
+        return f1, explanation_accuracy, explanation_complexity, explanations
+
     # function that evaluates the feature sets
     def _evaluate(self, candidates, args):
         fitness = []
-        list_of_splits2 = [split for split in self.skf.split(self.x_trainval_, self.y_trainval_)]
-        train_index, val_index = list_of_splits2[np.random.randint(0, self.skf.n_splits)]
-        x_train_, x_val = self.x_trainval_.iloc[train_index], self.x_trainval_.iloc[val_index]
-        y_train_, y_val = self.y_trainval_[train_index], self.y_trainval_[val_index]
-        x_train_, x_val = torch.FloatTensor(x_train_.values), torch.FloatTensor(x_val.values)
-        y_train_, y_val = one_hot(torch.LongTensor(y_train_)).float(), one_hot(torch.LongTensor(y_val)).float()
         for cid, c in enumerate(candidates):
-            if self.compression == 'features':
-                x_reduced = torch.zeros_like(x_train_)
-                x_reduced[:, c[1]] = x_train_[:, c[1]]
-                y_reduced = y_train_
-                x_val_reduced = torch.zeros_like(x_val)
-                x_val_reduced[:, c[1]] = x_val[:, c[1]]
-            # elif self.compression == 'samples':
-            #     x_reduced = x_train_[c[0]]
-            #     y_reduced = y_train_[c[0]]
-            #     x_val_reduced = x_val
-            # elif self.compression == 'both':
-            #     x_reduced = x_train_[c[0], c[1]]
-            #     y_reduced = y_train_[c[0]]
-            #     x_val_reduced = x_val[:, c[1]]
-
-            # train loop
-            self.lens.train()
-            for epoch in range(self.train_epochs):
-                self.optimizer_.zero_grad()
-                y_pred = self.lens(x_reduced).squeeze(-1)
-                loss = loss_form(y_pred, y_reduced)
-                loss.backward()
-                self.optimizer_.step()
-
-            f1 = f1_score(y_reduced.argmax(dim=-1), y_pred.argmax(dim=-1), average='weighted')
-            x = torch.FloatTensor(self.x_trainval_.values)
-            y1h = one_hot(torch.LongTensor(self.y_trainval_)).float()
-            explanations = entropy.explain_classes(self.lens, x, y1h, train_index, train_index,
-                                                   c_threshold=0., y_threshold=0, topk_explanations=100,
-                                                   max_minterm_complexity=5)
-            explanation_accuracy = np.min([exp_dict['explanation_accuracy'] for exp_dict in explanations.values()])
-            explanation_complexity = np.max([exp_dict['explanation_complexity'] for exp_dict in explanations.values()])
-
-            # maximizing the points removed also means
-            # minimizing the number of points taken (LOL)
-            objectives = [1-f1, 1-explanation_accuracy, explanation_complexity]
+            f1, explanation_accuracy, explanation_complexity, _ = self._evaluate_candidate(c[1], train=True)
+            objectives = [1 - f1, 1 - explanation_accuracy, explanation_complexity]
             fitness.append(inspyred.ec.emo.Pareto(objectives))
 
             if self.verbose:
-                print(f'Candidate {cid}/{len(candidates)}: {objectives}')
+                print(f'\t Candidate {cid}/{len(candidates)}: {objectives}')
 
         return fitness
 
     # the 'observer' function is called by inspyred algorithms at the end of every generation
     def _observe(self, population, num_generations, num_evaluations, args):
-        # sample_size = self.x_trainval_.shape[0]
-        # feature_size = self.x_trainval_.shape[1]
         old_time = args["current_time"]
-        # logger = args["logger"]
         current_time = datetime.datetime.now()
         delta_time = current_time - old_time
 
@@ -342,42 +366,77 @@ class EvoLENs(BaseEstimator, TransformerMixin):
         delta_time_string = str(delta_time)[:-7] + "s"
 
         best_candidate_id = np.argmin(np.array([candidate.fitness[0] for candidate in args['_ec'].archive]))
-        # best_candidate_id = np.argmax(np.array([candidate.fitness[2] for candidate in population]))
         best_candidate = args['_ec'].archive[best_candidate_id]
-        # best_candidate = population[0]
 
-        log = f"[{delta_time_string}] Generation {num_generations}, Best individual: "
-        # if self.compression == 'samples' or self.compression == 'both':
-        #     log += f"#samples={len(best_candidate.candidate[0])} (of {sample_size}), "
-        # if self.compression == 'features' or self.compression == 'both':
-        #     log += f"#features={len(best_candidate.candidate[1])} (of {feature_size}), "
-        log += f"error={best_candidate.fitness[0]*100:.2f}, exp_error={best_candidate.fitness[1]*100:.2f}, exp_complexity={best_candidate.fitness[2]:.2f}"
+        log = f"\n[{delta_time_string}] Generation {num_generations}/{self.max_generations_}, " \
+              f"Best individual: " \
+              f"error={best_candidate.fitness[0] * 100:.2f}, " \
+              f"exp_error={best_candidate.fitness[1] * 100:.2f}, " \
+              f"exp_complexity={best_candidate.fitness[2]:.2f}\n\n" \
+              f"New generation...\n"
 
         if self.verbose:
             print(log)
-        #     logger.info(log)
 
         args["current_time"] = current_time
 
 
 if __name__ == '__main__':
-    x, y = make_classification(n_samples=500, n_features=30, n_informative=5, n_classes=4, random_state=42)
+    x, y = make_classification(n_samples=1000, n_features=10, n_informative=2, n_classes=2,
+                               random_state=42, )
+    # x, y = load_iris(return_X_y=True)
+    # scaler = StandardScaler()
+    # x = scaler.fit_transform(x)
 
     layers = [
-        te.nn.EntropyLinear(x.shape[1], 10, n_classes=len(np.unique(y))),
+        te.nn.EntropyLinear(x.shape[1], 100, n_classes=len(np.unique(y))),
+        # torch.nn.Linear(x.shape[1], 100),
         torch.nn.LeakyReLU(),
-        torch.nn.Linear(10, 4),
-        torch.nn.LeakyReLU(),
-        torch.nn.Linear(4, 1),
+        # torch.nn.Linear(30, 10),
+        # torch.nn.LeakyReLU(),
+        torch.nn.Linear(100, 1),
+        # torch.nn.Linear(100, len(np.unique(y))),
     ]
     model = torch.nn.Sequential(*layers)
-    optimizer = 'adamw' #torch.optim.AdamW(model.parameters(), lr=0.001)
-    loss_form = torch.nn.BCEWithLogitsLoss()
-    for layer in model.children():
-        if hasattr(layer, 'reset_parameters'):
-            layer.reset_parameters()
+    optimizer = 'adamw'  #
+    optim = torch.optim.AdamW(model.parameters(), lr=0.001)
+    # loss_form = torch.nn.BCEWithLogitsLoss()
+    loss_form = torch.nn.CrossEntropyLoss()
+    # for layer in model.children():
+    #     if hasattr(layer, 'reset_parameters'):
+    #         layer.reset_parameters()
+    # model.train()
+    # for epoch in range(10000):
+    #     optim.zero_grad()
+    #     y_pred = model(torch.FloatTensor(x)).squeeze(-1)
+    #     loss = loss_form(y_pred, torch.LongTensor(y))
+    #     loss.backward()
+    #     optim.step()
+    #     if epoch % 100 == 0:
+    #         print(f'Epoch {epoch}/{10000}: {loss.item()}')
 
-    evo_lens = EvoLENs(model, optimizer, loss_form, compression='features', train_epochs=10)
+    evo_lens = EvoLENs(model, optimizer, loss_form, compression='features', train_epochs=10,
+                       max_generations=100, lr=0.001,)
     evo_lens.fit(x, y)
 
+    result_dir = './evolens_results/'
+    os.makedirs(result_dir, exist_ok=True)
+    joblib.dump(evo_lens, f'{result_dir}evo_lens.pkl')
+    evo_lens2 = joblib.load(f'{result_dir}evo_lens.pkl')
+    joblib.dump(evo_lens.best_set_, f'{result_dir}evo_lens_best.joblib')
+    joblib.dump(evo_lens.optimal_solutions_, f'{result_dir}evo_lens_solutions.joblib')
+    joblib.dump(evo_lens.feature_ranking_, f'{result_dir}evo_lens_feature_ranking.joblib')
+
+    print()
+    print('Best individual\'s features:')
+    print(evo_lens.best_set_['features'])
+    print()
+    print('Best individual\'s F1:')
+    print(evo_lens.best_set_['accuracy'])
+    print()
+    print('Best individual\'s explanation accuracy:')
+    print(evo_lens.best_set_['explanation_accuracy'])
+    print()
+    print('Best individual\'s explanation complexity:')
+    print(evo_lens.best_set_['explanation_complexity'])
     print()
