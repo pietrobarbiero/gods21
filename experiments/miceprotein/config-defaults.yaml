@@ -8,6 +8,12 @@ lr:
 max_generations:
   desc: Max generations for evolutionary algorithm
   value: 300
+pop_size:
+  desc: Population size for evolutionary algorithm
+  value: 100
 max_features:
   desc: Max features for feature selection
   value: 30
+train_epochs:
+  desc: Train epochs for each individual
+  value: 10
