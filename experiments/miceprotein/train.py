@@ -33,10 +33,11 @@ import seaborn as sns
 import networkx as nx
 from torch.nn.functional import one_hot, leaky_relu
 
-feature_selectors = ['MECO']
+# feature_selectors = ['MECO', '']
+# feature_selectors = []
 # models = ['DT']
 # models = ['RF']
-models = ['RF', 'DT']
+models = ['EVOLENS', 'RF', 'DT']
 # models = ['GCN', 'RF', 'DT']
 
 
@@ -72,36 +73,28 @@ def load_artifact(artifact, artifact_name, split, run):
     return artifact
 
 
-def cv_loop(feature_selector_name, model_name, x, y, train_index, test_index, split):
+def cv_loop(model_name, x, y, train_index, test_index, split):
     os.makedirs(f'./artifacts/{split}', exist_ok=True)
     trained_models = os.listdir(f'./artifacts/{split}')
 
     run = wandb.init(project="mice-protein", job_type='train', reinit=True,
-                     dir='./results', group=f"{feature_selector_name}-{model_name}")
+                     dir='./results', group=f"{model_name}")
     # run.config.update({"max_features": 10}, allow_val_change=True)
     # run.config.update({"max_generations": 2}, allow_val_change=True)
+    run.config.update({"n_features": x.shape[1]}, allow_val_change=True)
+    run.config.update({"n_classes": len(np.unique(y))}, allow_val_change=True)
 
-    feature_selector, model = build_model(feature_selector_name, model_name, run.config)
-
-    if f'{feature_selector_name}' not in trained_models:
-        feature_selector.fit(x[train_index].numpy(), y[train_index].argmax(dim=-1).numpy())
-        save_artifact(feature_selector, feature_selector_name, split, run)
-
-    feature_selector = load_artifact(feature_selector, feature_selector_name, split, run)
-    x_reduced = feature_selector.transform(x.numpy())
+    model = build_model(model_name, run.config, train_index=train_index, test_index=test_index)
 
     if f'{model_name}' not in trained_models:
-        model.fit(x_reduced[train_index], y[train_index].argmax(dim=-1).numpy())
+        if model_name == 'EVOLENS':
+            model.fit(x, y)
+        else:
+            model.fit(x[train_index], y[train_index].numpy())
+
         save_artifact(model, model_name, split, run)
 
     model = load_artifact(model, model_name, split, run)
-    accuracy = model.score(x_reduced[test_index], y[test_index].argmax(dim=-1).numpy())
-    f1 = f1_score(y[test_index].argmax(dim=-1).numpy(), model.predict(x_reduced[test_index]), average='macro')
-    run.summary["accuracy"] = accuracy
-    run.summary["f1"] = f1
-    run.summary["n_features"] = len(feature_selector.best_set_['features'])
-    run.summary["val_accuracy"] = feature_selector.best_set_['accuracy']
-
     run.finish()
 
     return
@@ -132,11 +125,10 @@ def main():
 
     sss = StratifiedShuffleSplit(n_splits=5, random_state=42)
     sss.get_n_splits(x, y)
-    y1h = one_hot(torch.LongTensor(y)).float()
+    # y1h = one_hot(torch.LongTensor(y)).float()
     for split, (train_index, test_index) in enumerate(sss.split(x, y)):
-        for feature_selector_name in feature_selectors:
-            for model_name in models:
-                cv_loop(feature_selector_name, model_name, x, y1h, train_index, test_index, split)
+        for model_name in models:
+            cv_loop(model_name, x, y, train_index, test_index, split)
 
     return
 

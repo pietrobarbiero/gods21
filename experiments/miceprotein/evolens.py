@@ -59,7 +59,8 @@ class EvoLENs(BaseEstimator, TransformerMixin):
                  max_samples: int = 500, min_samples: int = 50,
                  n_splits: int = 3, random_state: int = 42,
                  train_epochs: int = 10, reset_generations: int = 50,
-                 scoring: str = 'f1_weighted', verbose: bool = True):
+                 scoring: str = 'f1_weighted', trainval_index: torch.Tensor = None,
+                 test_index: torch.Tensor = None, verbose: bool = True):
 
         self.lens = lens
         self.optimizer_name = optimizer_name
@@ -77,12 +78,11 @@ class EvoLENs(BaseEstimator, TransformerMixin):
         self.scoring = scoring
         self.train_epochs = train_epochs
         self.reset_generations = reset_generations
+        self.trainval_index = trainval_index
+        self.test_index = test_index
         self.verbose = verbose
 
     def fit(self, X, y=None, **fit_params):
-        if not isinstance(X, pd.DataFrame):
-            X = pd.DataFrame(X)
-
         n = int(X.shape[0])
         k = int(X.shape[1])
 
@@ -99,10 +99,14 @@ class EvoLENs(BaseEstimator, TransformerMixin):
         self.optimizer_ = torch.optim.AdamW(self.lens.parameters(), lr=self.lr)
         self.train_epochs_ = self.train_epochs
 
-        self.x_, self.y_ = torch.FloatTensor(X.values), torch.LongTensor(y)
+        self.x_, self.y_ = torch.FloatTensor(X), torch.LongTensor(y)
         self.y1h_ = one_hot(torch.LongTensor(self.y_)).float()
-        self.skf_trainval_test_ = StratifiedKFold(n_splits=10, shuffle=True, random_state=self.random_state)
-        self.trainval_index_, self.test_index_ = next(self.skf_trainval_test_.split(self.x_, self.y_))
+        if self.trainval_index is None or self.test_index is None:
+            self.skf_trainval_test_ = StratifiedKFold(n_splits=10, shuffle=True, random_state=self.random_state)
+            self.trainval_index_, self.test_index_ = next(self.skf_trainval_test_.split(self.x_, self.y_))
+        else:
+            self.trainval_index_, self.test_index_ = self.trainval_index, self.test_index
+
         self.skf_train_val_ = StratifiedKFold(n_splits=10, shuffle=True, random_state=self.random_state)
         self.train_index_, self.val_index_ = next(self.skf_train_val_.split(self.x_[self.trainval_index_], self.y_[self.trainval_index_]))
 
@@ -313,7 +317,7 @@ class EvoLENs(BaseEstimator, TransformerMixin):
                 # y_pred = self.lens(x_reduced).squeeze(-1)
                 y_pred = self.lens(self.x_).squeeze(-1)
                 # loss = loss_form(y_pred[train_index], self.y_[train_index])
-                loss = loss_form(y_pred, self.y_)
+                loss = self.loss_form(y_pred, self.y_)
                 loss.backward()
                 self.optimizer_.step()
                 if epoch % 100 == 0:
