@@ -37,8 +37,8 @@ from torch.nn.functional import one_hot, leaky_relu
 # feature_selectors = []
 # models = ['DT']
 # models = ['RF']
-models = ['EVOLENS', 'RF', 'DT']
-# models = ['GCN', 'RF', 'DT']
+# models = ['EVOLENS', 'RF', 'DT']
+models = ['GCN', 'RF', 'DT']
 
 
 def save_artifact(artifact, artifact_name, split, run):
@@ -73,7 +73,7 @@ def load_artifact(artifact, artifact_name, split, run):
     return artifact
 
 
-def cv_loop(model_name, x, y, train_index, test_index, split):
+def cv_loop(model_name, x, y, train_index, test_index, split, fnames, cnames):
     os.makedirs(f'./artifacts/{split}', exist_ok=True)
     trained_models = os.listdir(f'./artifacts/{split}')
 
@@ -89,6 +89,10 @@ def cv_loop(model_name, x, y, train_index, test_index, split):
     if f'{model_name}' not in trained_models:
         if model_name == 'EVOLENS':
             model.fit(x, y)
+        elif model_name == 'GCN':
+            model = train_lens(x, y, [], train_index)
+            explanations = test_lens(model, x, y, [], train_index, test_index, fnames, cnames)
+            model.explanations = explanations
         else:
             model.fit(x[train_index], y[train_index].numpy())
 
@@ -121,14 +125,14 @@ def main():
     os.makedirs('./artifacts', exist_ok=True)
 
     # load data
-    x, y, is_control = load_data(data_path='../../data/MiceProtein.arff')
+    x, y, _, fnames, cnames = load_data(data_path='../../data/MiceProtein.arff')
 
     sss = StratifiedShuffleSplit(n_splits=5, random_state=42)
     sss.get_n_splits(x, y)
     # y1h = one_hot(torch.LongTensor(y)).float()
     for split, (train_index, test_index) in enumerate(sss.split(x, y)):
         for model_name in models:
-            cv_loop(model_name, x, y, train_index, test_index, split)
+            cv_loop(model_name, x, y, train_index, test_index, split, fnames, cnames)
 
     return
 

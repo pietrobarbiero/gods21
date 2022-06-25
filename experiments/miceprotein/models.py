@@ -75,7 +75,8 @@ def train_lens(x, y, edges, train_index):
     return model
 
 
-def test_lens(model, x, y1h, edges, train_index, test_index):
+def test_lens(model, x, y, edges, train_index, test_index, fnames, cnames):
+    y1h = one_hot(y, len(torch.unique(y)))
     y_pred = model(x, edges).squeeze(-1).detach()
     f1 = f1_score(y1h[test_index].argmax(dim=-1), y_pred[test_index].argmax(dim=-1), average='weighted')
     acc = accuracy_score(y1h[test_index].argmax(dim=-1), y_pred[test_index].argmax(dim=-1))
@@ -87,9 +88,10 @@ def test_lens(model, x, y1h, edges, train_index, test_index):
                                            max_minterm_complexity=10)
     for nc in range(y1h.shape[1]):
         explanations[f'{nc}']['explanation'] = te.logic.utils.replace_names(explanations[f'{nc}']['explanation'],
-                                                                            df.columns[1:-4])
-        explanations[f'{nc}']['name'] = le.classes_[nc]
+                                                                            fnames)
+        explanations[f'{nc}']['name'] = cnames[nc]
 
+    print(explanations)
     explanations['accuracy'] = acc
     explanations['f1'] = f1
     return explanations

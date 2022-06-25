@@ -20,4 +20,4 @@ def load_data(data_path='../../data/MiceProtein.arff'):
     le = preprocessing.LabelEncoder()
     y = le.fit_transform(df.iloc[:, -1])
     y = torch.LongTensor(y)
-    return x, y, is_control
+    return x, y, is_control, df.columns[1:-4], df.iloc[:, -1]
