@@ -53,12 +53,12 @@ class EvoLENs(BaseEstimator, TransformerMixin):
     """
 
     def __init__(self, lens: torch.nn.Module, optimizer_name, loss_form, lr: float = 0.01,
-                 compression: str = 'both',
+                 compression: str = 'both', pretrain: bool = True,
                  pop_size: int = 100, max_generations: int = 100,
                  max_features: int = 100, min_features: int = 10,
                  max_samples: int = 500, min_samples: int = 50,
                  n_splits: int = 3, random_state: int = 42,
-                 train_epochs: int = 10, reset_generations: int = 50,
+                 train_epochs: int = 10, reset_generations: int = 2,
                  scoring: str = 'f1_weighted', trainval_index: torch.Tensor = None,
                  test_index: torch.Tensor = None, verbose: bool = True):
 
@@ -67,6 +67,7 @@ class EvoLENs(BaseEstimator, TransformerMixin):
         self.loss_form = loss_form
         self.lr = lr
         self.compression = compression
+        self.pretrain = pretrain
         self.pop_size = pop_size
         self.max_generations = max_generations
         self.max_features = max_features
@@ -95,7 +96,7 @@ class EvoLENs(BaseEstimator, TransformerMixin):
         self.max_features_ = np.min([k, self.max_features])
         self.min_features_ = np.min([self.min_features, self.max_features_])
         self.max_samples_ = np.min([n, self.max_samples])
-        self.reset_generations_ = np.min([self.max_generations_, self.reset_generations])
+        self.reset_generations_ = 0
         self.optimizer_ = torch.optim.AdamW(self.lens.parameters(), lr=self.lr)
         self.train_epochs_ = self.train_epochs
 
@@ -110,25 +111,25 @@ class EvoLENs(BaseEstimator, TransformerMixin):
         self.skf_train_val_ = StratifiedKFold(n_splits=10, shuffle=True, random_state=self.random_state)
         self.train_index_, self.val_index_ = next(self.skf_train_val_.split(self.x_[self.trainval_index_], self.y_[self.trainval_index_]))
 
-        # self.train_epochs_ = 10000
-        # # for layer in self.lens.children():
-        # #     if hasattr(layer, 'reset_parameters'):
-        # #         layer.reset_parameters()
-        # self.optimizer_ = torch.optim.AdamW(self.lens.parameters(), lr=self.lr)
-        # candidate = np.arange(0, self.x_.shape[1])
-        # print(candidate)
-        # self._evaluate_candidate(candidate, train=True)
-        # f1, explanation_accuracy, explanation_complexity, explanations = self._evaluate_candidate(candidate, train=False)
-        # for layer in self.lens.children():
-        #     if hasattr(layer, 'reset_parameters'):
-        #         layer.reset_parameters()
-        # self.optimizer_ = torch.optim.AdamW(self.lens.parameters(), lr=self.lr)
-        # self.train_epochs_ = self.train_epochs
-        #
-        # print('Initial F1: {:.2f}'.format(f1))
-        # print('Initial explanation accuracy: {:.2f}'.format(explanation_accuracy))
-        # print('Initial explanation complexity: {:.2f}'.format(explanation_complexity))
-        # print('Initial explanations: {}'.format(explanations))
+        if self.pretrain:
+            self.train_epochs_ = 4000
+            # # for layer in self.lens.children():
+            # #     if hasattr(layer, 'reset_parameters'):
+            # #         layer.reset_parameters()
+            # self.optimizer_ = torch.optim.AdamW(self.lens.parameters(), lr=self.lr)
+            candidate = np.arange(0, self.x_.shape[1])
+            self._evaluate_candidate(candidate, train=True)
+            f1, explanation_accuracy, explanation_complexity, explanations = self._evaluate_candidate(candidate, train=False)
+            # for layer in self.lens.children():
+            #     if hasattr(layer, 'reset_parameters'):
+            #         layer.reset_parameters()
+            # self.optimizer_ = torch.optim.AdamW(self.lens.parameters(), lr=self.lr)
+            self.train_epochs_ = self.train_epochs
+
+            print('Initial F1: {:.2f}'.format(f1))
+            print('Initial explanation accuracy: {:.2f}'.format(explanation_accuracy))
+            print('Initial explanation complexity: {:.2f}'.format(explanation_complexity))
+            print('Initial explanations: {}'.format(explanations))
 
         # initialize pseudo-random number generation
         prng = random.Random()
@@ -163,7 +164,7 @@ class EvoLENs(BaseEstimator, TransformerMixin):
         f1_best = 0
         self.optimal_solutions_ = []
         feature_counts = np.zeros(X.shape[1])
-        self.train_epochs_ = 2000
+        self.train_epochs_ = 4000
         for individual in self.ea.archive:
             candidate = individual.candidate[1]
             feature_counts[candidate] += 1
@@ -306,10 +307,8 @@ class EvoLENs(BaseEstimator, TransformerMixin):
         val_mask[self.test_index_] = False
         val_index = torch.where(val_mask)[0]
 
-        # TODO: reset the model
-
         # train loop
-        if train:
+        if train and self.pretrain:
             self.optimizer_ = torch.optim.AdamW(self.lens.parameters(), lr=self.lr)
             self.lens.train()
             for epoch in range(self.train_epochs_):
@@ -357,6 +356,15 @@ class EvoLENs(BaseEstimator, TransformerMixin):
             if self.verbose:
                 print(f'\t Candidate {cid}/{len(candidates)}: {objectives}')
 
+        if self.reset_generations_ > self.reset_generations:
+            for layer in self.lens.children():
+                if hasattr(layer, 'reset_parameters'):
+                    layer.reset_parameters()
+            self.optimizer_ = torch.optim.AdamW(self.lens.parameters(), lr=self.lr)
+            self.reset_generations_ = 0
+        else:
+            self.reset_generations_ += 1
+
         return fitness
 
     # the 'observer' function is called by inspyred algorithms at the end of every generation
@@ -371,9 +379,19 @@ class EvoLENs(BaseEstimator, TransformerMixin):
 
         best_candidate_id = np.argmin(np.array([candidate.fitness[0] for candidate in args['_ec'].archive]))
         best_candidate = args['_ec'].archive[best_candidate_id]
-
         log = f"\n[{delta_time_string}] Generation {num_generations}/{self.max_generations_}, " \
-              f"Best individual: " \
+              f"Best individual (model): " \
+              f"error={best_candidate.fitness[0] * 100:.2f}, " \
+              f"exp_error={best_candidate.fitness[1] * 100:.2f}, " \
+              f"exp_complexity={best_candidate.fitness[2]:.2f}\n\n" \
+              f"New generation...\n"
+
+        if self.verbose:
+            print(log)
+
+        best_candidate_id = np.argmin(np.array([candidate.fitness[1] for candidate in args['_ec'].archive]))
+        best_candidate = args['_ec'].archive[best_candidate_id]
+        log = f"Best individual (explanation): " \
               f"error={best_candidate.fitness[0] * 100:.2f}, " \
               f"exp_error={best_candidate.fitness[1] * 100:.2f}, " \
               f"exp_complexity={best_candidate.fitness[2]:.2f}\n\n" \
