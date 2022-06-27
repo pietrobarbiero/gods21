@@ -39,6 +39,7 @@ from torch.nn.functional import one_hot, leaky_relu
 # models = ['RF']
 # models = ['EVOLENS', 'RF', 'DT']
 models = ['GCN', 'RF', 'DT']
+# models = ['DT']
 
 
 def save_artifact(artifact, artifact_name, split, run):
@@ -51,7 +52,8 @@ def save_artifact(artifact, artifact_name, split, run):
     os.makedirs(model_path, exist_ok=True)
     if artifact_name == 'GCN':
         artifact_file = os.path.join(model_path, 'model.pth')
-        torch.save(artifact.state_dict(), artifact_file)
+        # torch.save(artifact.state_dict(), artifact_file)
+        torch.save(artifact, artifact_file)
     else:
         artifact_file = os.path.join(model_path, 'model.pkl')
         joblib.dump(artifact, artifact_file)
@@ -66,7 +68,8 @@ def load_artifact(artifact, artifact_name, split, run):
     # model_path = model_at.download()
     model_path = os.path.join('./artifacts', str(split), artifact_name)
     if artifact_name == 'GCN':
-        artifact.load_state_dict(torch.load(os.path.join(model_path, 'model.pth')))
+        # artifact.load_state_dict(torch.load(os.path.join(model_path, 'model.pth')))
+        artifact = torch.load(os.path.join(model_path, 'model.pth'))
     else:
         artifact = joblib.load(os.path.join(model_path, "model.pkl"))
 
@@ -90,11 +93,16 @@ def cv_loop(model_name, x, y, train_index, test_index, split, fnames, cnames):
         if model_name == 'EVOLENS':
             model.fit(x, y)
         elif model_name == 'GCN':
-            model = train_lens(x, y, [], train_index)
+            model = train_lens(x, y, [], train_index, run.config['temperature'])
+            print(model.lens.alpha_norm.median(dim=0)[0].detach().numpy())
             explanations = test_lens(model, x, y, [], train_index, test_index, fnames, cnames)
-            model.explanations = explanations
+            joblib.dump(explanations, os.path.join('./artifacts', str(split), f'explanations.pkl'))
         else:
             model.fit(x[train_index], y[train_index].numpy())
+            # print(f'{model_name} trained')
+            # print(model.score(x[test_index], y[test_index].numpy()))
+            # print(model.tree_.node_count)
+            # return
 
         save_artifact(model, model_name, split, run)
 

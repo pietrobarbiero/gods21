@@ -17,3 +17,9 @@ max_features:
 train_epochs:
   desc: Train epochs for each individual
   value: 10
+max_depth:
+  desc: Max depth for decision tree
+  value: 5
+temperature:
+  desc: Softmax temperature for LENs
+  value: 0.5

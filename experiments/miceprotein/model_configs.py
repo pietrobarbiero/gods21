@@ -12,9 +12,9 @@ from evolens import EvoLENs
 
 def build_model(model_name, config, train_index=None, test_index=None):
     if model_name == 'DT':
-        model = DecisionTreeClassifier(random_state=42)
+        model = DecisionTreeClassifier(random_state=42, max_depth=config['max_depth'])
     elif model_name == 'RF':
-        model = RandomForestClassifier(random_state=42)
+        model = RandomForestClassifier(random_state=42, max_depth=config['max_depth'])
     elif model_name == 'EVOLENS':
         layers = [
             te.nn.EntropyLinear(config['n_features'], 20, n_classes=config['n_classes']),

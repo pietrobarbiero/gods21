@@ -28,7 +28,7 @@ from torch.nn.functional import one_hot, leaky_relu
 
 
 class GCN(nn.Module):
-    def __init__(self, num_in_features, num_hidden_features, num_classes):
+    def __init__(self, num_in_features, num_hidden_features, num_classes, temperature):
         super(GCN, self).__init__()
         self.num_classes = num_classes
 
@@ -36,7 +36,7 @@ class GCN(nn.Module):
         #         self.conv1 = GCNConv(num_hidden_features, 1)
 
         # linear layers
-        self.lens = te.nn.EntropyLinear(num_in_features, num_hidden_features, n_classes=num_classes, temperature=1)
+        self.lens = te.nn.EntropyLinear(num_in_features, num_hidden_features, n_classes=num_classes, temperature=temperature)
         self.linear = nn.Linear(num_hidden_features, 1)
 
     def forward(self, x, edge_index):
@@ -57,8 +57,8 @@ class GCN(nn.Module):
         return x
 
 
-def train_lens(x, y, edges, train_index):
-    model = GCN(x.shape[1], 50, len(torch.unique(y)))
+def train_lens(x, y, edges, train_index, temperature):
+    model = GCN(x.shape[1], 50, len(torch.unique(y)), temperature)
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
     loss_form = torch.nn.CrossEntropyLoss()
     model.train()
@@ -84,12 +84,12 @@ def test_lens(model, x, y, edges, train_index, test_index, fnames, cnames):
     explanations = entropy.explain_classes(model, x, y1h, train_index, test_index, edge_index=edges,
                                            #                                            c_threshold=0., y_threshold=0, topk_explanations=500,
                                            #                                            max_minterm_complexity=3)
-                                           c_threshold=0., y_threshold=0, topk_explanations=100,
-                                           max_minterm_complexity=10)
-    for nc in range(y1h.shape[1]):
-        explanations[f'{nc}']['explanation'] = te.logic.utils.replace_names(explanations[f'{nc}']['explanation'],
-                                                                            fnames)
-        explanations[f'{nc}']['name'] = cnames[nc]
+                                           c_threshold=0., y_threshold=0, topk_explanations=10000,
+                                           max_minterm_complexity=5, concept_names=fnames, class_names=cnames)
+    # for nc in range(y1h.shape[1]):
+    #     explanations[f'{nc}']['explanation'] = te.logic.utils.replace_names(explanations[f'{nc}']['explanation'],
+    #                                                                         fnames)
+    #     explanations[f'{nc}']['name'] = cnames[nc]
 
     print(explanations)
     explanations['accuracy'] = acc
