@@ -81,7 +81,7 @@ def test_lens(model, x, y, edges, train_index, test_index, fnames, cnames):
     f1 = f1_score(y1h[test_index].argmax(dim=-1), y_pred[test_index].argmax(dim=-1), average='weighted')
     acc = accuracy_score(y1h[test_index].argmax(dim=-1), y_pred[test_index].argmax(dim=-1))
     print(f'Test F1: {f1}')
-    explanations = entropy.explain_classes(model, x, y1h, train_index, test_index, edge_index=edges,
+    explanations, _ = entropy.explain_classes(model, x, y1h, train_index, test_index, edge_index=edges,
                                            #                                            c_threshold=0., y_threshold=0, topk_explanations=500,
                                            #                                            max_minterm_complexity=3)
                                            c_threshold=0., y_threshold=0, topk_explanations=10000,
