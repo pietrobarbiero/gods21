@@ -33,6 +33,7 @@ import numpy as np
 import seaborn as sns
 import networkx as nx
 from torch.nn.functional import one_hot, leaky_relu
+from sklearn.feature_selection import RFECV
 
 # feature_selectors = ['MECO', '']
 # feature_selectors = []
@@ -93,27 +94,33 @@ def cv_loop(model_name, x, y, train_index, test_index, split, fnames, cnames):
     model = build_model(model_name, run.config, train_index=train_index, test_index=test_index)
 
     if f'{model_name}' not in trained_models:
-        skb = SelectKBest(f_classif, k=100)
-        skb.fit(x[train_index], y[train_index])
-        x_new = skb.transform(x)
-        x_new = torch.FloatTensor(x_new)
-        if model_name == 'EVOLENS':
-            model.fit(x_new, y)
-        elif model_name == 'GCN':
-            model = train_lens(x_new, y, [], train_index, run.config['temperature'])
-            print(model.lens.alpha_norm.median(dim=0)[0].detach().numpy())
-            print(model.lens.alpha_norm.max(dim=0)[0].detach().numpy())
-            print(model.lens.alpha_norm.min(dim=0)[0].detach().numpy())
-            explanations = test_lens(model, x_new, y, [], train_index, test_index, fnames, cnames)
-            joblib.dump(explanations, os.path.join('./stras-artifacts', str(split), f'explanations.pkl'))
-        else:
-            model.fit(x_new[train_index], y[train_index].numpy())
-            print(f'{model_name} trained')
-            print(model.score(x_new[test_index], y[test_index].numpy()))
-            # print(model.tree_.node_count)
-            # return
+        # skb = SelectKBest(f_classif, k=100)
+        rfe = RFECV(RandomForestClassifier(random_state=42), cv=3, verbose=1, n_jobs=3, min_features_to_select=1)#, min_features_to_select=x.shape[1]-2)
+        # rfe.fit(x[train_index], y[train_index])
+        rfe.fit(x, y)
+        joblib.dump(rfe, os.path.join('./stras-artifacts', f'rfe.joblib'))
+        # x_new = rfe.transform(x)
+        # x_new = torch.FloatTensor(x_new)
+        # https://scikit-learn.org/stable/auto_examples/feature_selection/plot_rfe_with_cross_validation.html#sphx-glr-auto-examples-feature-selection-plot-rfe-with-cross-validation-py
+        # if model_name == 'EVOLENS':
+        #     model.fit(x_new, y)
+        # elif model_name == 'GCN':
+            # model = train_lens(x_new, y, [], train_index, run.config['temperature'])
+            # print(model.lens.alpha_norm.median(dim=0)[0].detach().numpy())
+            # print(model.lens.alpha_norm.max(dim=0)[0].detach().numpy())
+            # print(model.lens.alpha_norm.min(dim=0)[0].detach().numpy())
+            # explanations = test_lens(model, x_new, y, [], train_index, test_index, fnames[rfe.support_], cnames)
+            # joblib.dump(explanations, os.path.join('./stras-artifacts', str(split), f'explanations.joblib'))
+            # joblib.dump(rfe, os.path.join('./stras-artifacts', str(split), f'rfe.joblib'))
 
-        save_artifact(model, model_name, split, run)
+        # else:
+        #     model.fit(x_new[train_index], y[train_index].numpy())
+        #     print(f'{model_name} trained')
+        #     print(model.score(x_new[test_index], y[test_index].numpy()))
+        #     # print(model.tree_.node_count)
+        #     # return
+        #
+        # save_artifact(model, model_name, split, run)
 
     model = load_artifact(model, model_name, split, run)
     run.finish()
@@ -147,11 +154,13 @@ def main():
     sss = StratifiedShuffleSplit(n_splits=10, random_state=42)
     sss.get_n_splits(x, y)
     # y1h = one_hot(torch.LongTensor(y)).float()
+    joblib.dump(fnames, os.path.join('./stras-artifacts', f'fnames.joblib'))
     for split, (train_index, test_index) in enumerate(sss.split(x, y)):
         for model_name in models:
-            cv_loop(model_name, x, y, train_index, test_index, split, fnames, cnames)
+            train_index = test_index = np.arange(0, x.shape[1], 1)
+            cv_loop(model_name, x, y, train_index, test_index, 0, fnames, cnames)
 
-    return
+            return
 
 
 if __name__ == '__main__':
