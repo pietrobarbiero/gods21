@@ -1,41 +1,41 @@
 ,Fold,Accuracy (%),Complexity,Explanation
-0,$1$,$99.07$,$5$,$c-CS-s \leftarrow pPKCAB \land ERK \land TRKA \land \neg NUMB \land \neg P70S6$
-1,$1$,$100.00$,$3$,$t-CS-s \leftarrow pCAMKII \land pPKCAB \land \neg pPKCG$
-2,$1$,$93.52$,$4$,$t-SC-m \leftarrow NR2A \land \neg ITSN1 \land \neg pPKCAB \land \neg S6$
-3,$1$,$99.07$,$4$,$c-SC-m \leftarrow pCAMKII \land pPKCAB \land \neg GSK3B \land \neg RAPTOR$
+0,$1$,$99.07$,$5$,$t-SC-m \leftarrow pPKCAB \land ERK \land TRKA \land \neg NUMB \land \neg P70S6$
+1,$1$,$100.00$,$3$,$t-CS-m \leftarrow pCAMKII \land pPKCAB \land \neg pPKCG$
+2,$1$,$93.52$,$4$,$c-SC-m \leftarrow NR2A \land \neg ITSN1 \land \neg pPKCAB \land \neg S6$
+3,$1$,$99.07$,$4$,$t-CS-s \leftarrow pCAMKII \land pPKCAB \land \neg GSK3B \land \neg RAPTOR$
 4,$1$,$98.15$,$5$,$c-CS-m \leftarrow ITSN1 \land APP \land CaNA \land \neg ELK \land \neg pPKCG$
-5,$1$,$95.37$,$4$,$t-CS-m \leftarrow ITSN1 \land pELK \land \neg pPKCAB \land \neg pCASP9$
-6,$1$,$95.37$,$5$,$c-SC-s \leftarrow APP \land SOD1 \land \neg ERK \land \neg GluR3 \land \neg SYP$
-7,$1$,$99.07$,$5$,$t-SC-s \leftarrow TIAM1 \land pPKCG \land \neg pNR2B \land \neg P70S6 \land \neg SYP$
-8,$2$,$99.07$,$4$,$c-CS-s \leftarrow pNR1 \land \neg pCAMKII \land \neg SOD1 \land \neg TIAM1$
-9,$2$,$98.15$,$4$,$t-CS-s \leftarrow pRSK \land pNUMB \land CaNA \land \neg pPKCG$
-10,$2$,$96.30$,$3$,$t-SC-m \leftarrow SOD1 \land \neg AKT \land \neg pPKCG$
-11,$2$,$95.37$,$5$,$c-SC-m \leftarrow pCAMKII \land \neg pELK \land \neg DSCR1 \land \neg AMPKA \land \neg AcetylH3K9$
+5,$1$,$95.37$,$4$,$c-SC-s \leftarrow ITSN1 \land pELK \land \neg pPKCAB \land \neg pCASP9$
+6,$1$,$95.37$,$5$,$t-SC-s \leftarrow APP \land SOD1 \land \neg ERK \land \neg GluR3 \land \neg SYP$
+7,$1$,$99.07$,$5$,$c-CS-s \leftarrow TIAM1 \land pPKCG \land \neg pNR2B \land \neg P70S6 \land \neg SYP$
+8,$2$,$99.07$,$4$,$t-SC-m \leftarrow pNR1 \land \neg pCAMKII \land \neg SOD1 \land \neg TIAM1$
+9,$2$,$98.15$,$4$,$t-CS-m \leftarrow pRSK \land pNUMB \land CaNA \land \neg pPKCG$
+10,$2$,$96.30$,$3$,$c-SC-m \leftarrow SOD1 \land \neg AKT \land \neg pPKCG$
+11,$2$,$95.37$,$5$,$t-CS-s \leftarrow pCAMKII \land \neg pELK \land \neg DSCR1 \land \neg AMPKA \land \neg AcetylH3K9$
 12,$2$,$95.37$,$5$,$c-CS-m \leftarrow pERK \land APP \land CaNA \land \neg Tau \land \neg pCASP9$
-13,$2$,$97.22$,$4$,$t-CS-m \leftarrow BRAF \land \neg ERK \land \neg RAPTOR \land \neg pP70S6$
-14,$2$,$97.22$,$4$,$c-SC-s \leftarrow TRKA \land APP \land \neg ERK \land \neg CaNA$
-15,$2$,$99.07$,$4$,$t-SC-s \leftarrow Bcatenin \land pPKCG \land \neg pCAMKII \land \neg ERK$
-16,$3$,$100.00$,$4$,$c-CS-s \leftarrow NR1 \land pELK \land pCASP9 \land \neg pNR2B$
-17,$3$,$100.00$,$4$,$t-CS-s \leftarrow pNR1 \land \neg pCAMKII \land \neg TRKA \land \neg Bcatenin$
-18,$3$,$99.07$,$4$,$t-SC-m \leftarrow pNR2A \land GluR4 \land EGR1 \land \neg ADARB1$
-19,$3$,$93.52$,$3$,$c-SC-m \leftarrow pCAMKII \land \neg pNUMB \land \neg P70S6$
+13,$2$,$97.22$,$4$,$c-SC-s \leftarrow BRAF \land \neg ERK \land \neg RAPTOR \land \neg pP70S6$
+14,$2$,$97.22$,$4$,$t-SC-s \leftarrow TRKA \land APP \land \neg ERK \land \neg CaNA$
+15,$2$,$99.07$,$4$,$c-CS-s \leftarrow Bcatenin \land pPKCG \land \neg pCAMKII \land \neg ERK$
+16,$3$,$100.00$,$4$,$t-SC-m \leftarrow NR1 \land pELK \land pCASP9 \land \neg pNR2B$
+17,$3$,$100.00$,$4$,$t-CS-m \leftarrow pNR1 \land \neg pCAMKII \land \neg TRKA \land \neg Bcatenin$
+18,$3$,$99.07$,$4$,$c-SC-m \leftarrow pNR2A \land GluR4 \land EGR1 \land \neg ADARB1$
+19,$3$,$93.52$,$3$,$t-CS-s \leftarrow pCAMKII \land \neg pNUMB \land \neg P70S6$
 20,$3$,$93.52$,$4$,$c-CS-m \leftarrow DYRK1A \land pCASP9 \land CaNA \land \neg Ubiquitin$
-21,$3$,$98.15$,$5$,$t-CS-m \leftarrow DYRK1A \land ITSN1 \land ERK \land pPKCG \land \neg pCASP9$
-22,$3$,$100.00$,$5$,$c-SC-s \leftarrow TRKA \land SHH \land \neg pP70S6 \land \neg GluR3 \land \neg SYP$
-23,$3$,$96.30$,$4$,$t-SC-s \leftarrow pNUMB \land pP70S6 \land pPKCG \land \neg pPKCAB$
-24,$4$,$100.00$,$4$,$c-CS-s \leftarrow pERK \land NR2B \land IL1B \land \neg P70S6$
-25,$4$,$99.07$,$5$,$t-CS-s \leftarrow pCASP9 \land \neg pELK \land \neg pJNK \land \neg IL1B \land \neg pGSK3B_Tyr216$
-26,$4$,$95.37$,$5$,$t-SC-m \leftarrow PSD95 \land EGR1 \land \neg ITSN1 \land \neg pPKCAB \land \neg CaNA$
-27,$4$,$98.15$,$5$,$c-SC-m \leftarrow NR1 \land AcetylH3K9 \land PSD95 \land \neg ITSN1 \land \neg P70S6$
+21,$3$,$98.15$,$5$,$c-SC-s \leftarrow DYRK1A \land ITSN1 \land ERK \land pPKCG \land \neg pCASP9$
+22,$3$,$100.00$,$5$,$t-SC-s \leftarrow TRKA \land SHH \land \neg pP70S6 \land \neg GluR3 \land \neg SYP$
+23,$3$,$96.30$,$4$,$c-CS-s \leftarrow pNUMB \land pP70S6 \land pPKCG \land \neg pPKCAB$
+24,$4$,$100.00$,$4$,$t-SC-m \leftarrow pERK \land NR2B \land IL1B \land \neg P70S6$
+25,$4$,$99.07$,$5$,$t-CS-m \leftarrow pCASP9 \land \neg pELK \land \neg pJNK \land \neg IL1B \land \neg pGSK3B_Tyr216$
+26,$4$,$95.37$,$5$,$c-SC-m \leftarrow PSD95 \land EGR1 \land \neg ITSN1 \land \neg pPKCAB \land \neg CaNA$
+27,$4$,$98.15$,$5$,$t-CS-s \leftarrow NR1 \land AcetylH3K9 \land PSD95 \land \neg ITSN1 \land \neg P70S6$
 28,$4$,$97.22$,$5$,$c-CS-m \leftarrow DYRK1A \land pERK \land \neg CAMKII \land \neg ERK \land \neg ADARB1$
-29,$4$,$92.59$,$5$,$t-CS-m \leftarrow pERK \land TRKA \land S6 \land \neg pNR1 \land \neg P38$
-30,$4$,$100.00$,$4$,$c-SC-s \leftarrow ITSN1 \land pMTOR \land \neg ELK \land \neg pP70S6$
-31,$4$,$88.89$,$5$,$t-SC-s \leftarrow DSCR1 \land pNUMB \land \neg pNR2B \land \neg pPKCAB \land \neg ERK$
-32,$5$,$99.07$,$4$,$c-CS-s \leftarrow pJNK \land GSK3B \land \neg pELK \land \neg AKT$
-33,$5$,$94.44$,$5$,$t-CS-s \leftarrow BRAF \land CaNA \land \neg pCAMKII \land \neg TRKA \land \neg IL1B$
-34,$5$,$91.67$,$5$,$t-SC-m \leftarrow pNR2A \land \neg DYRK1A \land \neg ITSN1 \land \neg S6 \land \neg CaNA$
-35,$5$,$98.15$,$4$,$c-SC-m \leftarrow pCAMKII \land AKT \land \neg DSCR1 \land \neg PSD95$
+29,$4$,$92.59$,$5$,$c-SC-s \leftarrow pERK \land TRKA \land S6 \land \neg pNR1 \land \neg P38$
+30,$4$,$100.00$,$4$,$t-SC-s \leftarrow ITSN1 \land pMTOR \land \neg ELK \land \neg pP70S6$
+31,$4$,$88.89$,$5$,$c-CS-s \leftarrow DSCR1 \land pNUMB \land \neg pNR2B \land \neg pPKCAB \land \neg ERK$
+32,$5$,$99.07$,$4$,$t-SC-m \leftarrow pJNK \land GSK3B \land \neg pELK \land \neg AKT$
+33,$5$,$94.44$,$5$,$t-CS-m \leftarrow BRAF \land CaNA \land \neg pCAMKII \land \neg TRKA \land \neg IL1B$
+34,$5$,$91.67$,$5$,$c-SC-m \leftarrow pNR2A \land \neg DYRK1A \land \neg ITSN1 \land \neg S6 \land \neg CaNA$
+35,$5$,$98.15$,$4$,$t-CS-s \leftarrow pCAMKII \land AKT \land \neg DSCR1 \land \neg PSD95$
 36,$5$,$95.37$,$4$,$c-CS-m \leftarrow pERK \land pP70S6 \land CaNA \land \neg pCASP9$
-37,$5$,$85.19$,$5$,$t-CS-m \leftarrow S6 \land \neg pNR1 \land \neg AMPKA \land \neg GluR4 \land \neg pCASP9$
-38,$5$,$98.15$,$4$,$c-SC-s \leftarrow ADARB1 \land \neg ERK \land \neg GluR4 \land \neg CaNA$
-39,$5$,$100.00$,$5$,$t-SC-s \leftarrow Bcatenin \land pPKCG \land pCASP9 \land \neg pNR2A \land \neg CaNA$
+37,$5$,$85.19$,$5$,$c-SC-s \leftarrow S6 \land \neg pNR1 \land \neg AMPKA \land \neg GluR4 \land \neg pCASP9$
+38,$5$,$98.15$,$4$,$t-SC-s \leftarrow ADARB1 \land \neg ERK \land \neg GluR4 \land \neg CaNA$
+39,$5$,$100.00$,$5$,$c-CS-s \leftarrow Bcatenin \land pPKCG \land pCASP9 \land \neg pNR2A \land \neg CaNA$
